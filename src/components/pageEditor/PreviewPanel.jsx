@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useThemeLocale } from "../../hooks/useThemeLocale";
 import { fetchPreviewToken, scrollElementIntoView, updatePreview } from "../../queries/previewManager";
@@ -12,6 +12,10 @@ import SelectionOverlay from "./SelectionOverlay";
 function buildPreviewUrl(token) {
   return `${BASE_URL}/render/${token}`;
 }
+
+/** Preset device-frame widths (matches former 48rem / 24rem at 16px root). */
+const DEVICE_FRAME_PRESET_PX = { tablet: 768, mobile: 384 };
+const DEVICE_FRAME_MIN_WIDTH_PX = 300;
 
 /**
  * Detect if changes are structural (requiring full reload) or content-only (can be morphed)
@@ -164,6 +168,11 @@ const PreviewPanel = forwardRef(function PreviewPanel(
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [previewReadyKey, setPreviewReadyKey] = useState(0);
   const iframeRef = useRef(null);
+  const previewHostRef = useRef(null);
+  const deviceFrameWrapperRef = useRef(null);
+  const [previewHostWidthPx, setPreviewHostWidthPx] = useState(0);
+  /** Custom device-frame width when tablet/mobile; null = use preset */
+  const [deviceFrameWidthPx, setDeviceFrameWidthPx] = useState(null);
 
   // A single ref to hold the entire previous state for comparison
   const previousStateRef = useRef(null);
@@ -189,6 +198,93 @@ const PreviewPanel = forwardRef(function PreviewPanel(
     setInitialLoadComplete(false);
     setLoading(Boolean(page?.id));
   }, [activeProject?.id, page?.id, runtimeMode]);
+
+  useEffect(() => {
+    setDeviceFrameWidthPx(null);
+  }, [previewMode]);
+
+  useEffect(() => {
+    const el = previewHostRef.current;
+    if (!el) return;
+
+    const applyWidth = () => {
+      setPreviewHostWidthPx(el.getBoundingClientRect().width);
+    };
+
+    applyWidth();
+    const ro = new ResizeObserver(applyWidth);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [previewSrc]);
+
+  const isDevicePreview = previewMode !== "desktop";
+
+  const deviceFrameWidthClamped = useMemo(() => {
+    if (!isDevicePreview) return null;
+    const preset = DEVICE_FRAME_PRESET_PX[previewMode] ?? DEVICE_FRAME_PRESET_PX.mobile;
+    const base = deviceFrameWidthPx ?? preset;
+    const maxAllowed =
+      previewHostWidthPx > 0 ? previewHostWidthPx : Number.MAX_SAFE_INTEGER;
+    return Math.min(Math.max(base, DEVICE_FRAME_MIN_WIDTH_PX), maxAllowed);
+  }, [isDevicePreview, previewMode, deviceFrameWidthPx, previewHostWidthPx]);
+
+  const startDeviceFrameResize = useCallback(
+    (event) => {
+      if (event.button !== 0 || deviceFrameWidthClamped == null) return;
+      if (event.pointerType === "touch" || event.pointerType === "pen") return;
+      event.preventDefault();
+
+      const wrapper = deviceFrameWrapperRef.current;
+      if (!wrapper) return;
+
+      const startWidth = deviceFrameWidthClamped;
+      let lastWidth = startWidth;
+      const handle = event.currentTarget;
+      const pointerId = event.pointerId;
+
+      try {
+        handle.setPointerCapture(pointerId);
+      } catch {
+        // capture unsupported or invalid — resize still works via window listeners
+      }
+
+      const onMove = (moveEvent) => {
+        const hostEl = previewHostRef.current;
+        const liveMax =
+          hostEl && hostEl.getBoundingClientRect().width > 0
+            ? hostEl.getBoundingClientRect().width
+            : previewHostWidthPx || startWidth;
+        const dx = moveEvent.clientX - event.clientX;
+        lastWidth = Math.min(
+          Math.max(startWidth + dx, DEVICE_FRAME_MIN_WIDTH_PX),
+          liveMax,
+        );
+        wrapper.style.width = `${lastWidth}px`;
+      };
+
+      const finish = () => {
+        try {
+          handle.releasePointerCapture(pointerId);
+        } catch {
+          // ignore
+        }
+        wrapper.style.width = "";
+        setDeviceFrameWidthPx(lastWidth);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", finish);
+        window.removeEventListener("pointercancel", finish);
+      };
+
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", finish);
+      window.addEventListener("pointercancel", finish);
+    },
+    [deviceFrameWidthClamped, previewHostWidthPx],
+  );
 
   // Detect structural changes during render (before child effects fire).
   // This sets the ref synchronously so SelectionOverlay can check it in its effects.
@@ -594,28 +690,61 @@ const PreviewPanel = forwardRef(function PreviewPanel(
         </div>
       )}
       {previewSrc && (
-        <iframe
-          ref={iframeRef}
-          src={previewSrc}
-          title={t("pageEditor.preview.title")}
-          {...(runtimeMode === "standalone"
-            ? {
-                sandbox:
-                  "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-top-navigation-by-user-activation",
-              }
-            : {})}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-          allowFullScreen
-          className={`w-full h-full border-0 transition-all duration-300 ease-in-out mx-auto ${
-            previewMode !== "desktop" ? "shadow-2xl" : ""
-          }`}
-          style={{
-            maxWidth: previewMode === "desktop" ? "100%" : previewMode === "tablet" ? "48rem" : "24rem",
-          }}
-          onLoad={() => {
-            setInitialLoadComplete(true);
-          }}
-        />
+        <div ref={previewHostRef} className="absolute inset-0 flex min-h-0 min-w-0">
+          {isDevicePreview ? (
+            <div className="flex flex-1 justify-center items-stretch min-h-0 min-w-0 overflow-hidden">
+              <div
+                ref={deviceFrameWrapperRef}
+                className="relative flex h-full min-h-0 shrink-0 shadow-2xl"
+                style={{
+                  width: deviceFrameWidthClamped,
+                  maxWidth: "100%",
+                }}
+              >
+                <iframe
+                  ref={iframeRef}
+                  src={previewSrc}
+                  title={t("pageEditor.preview.title")}
+                  {...(runtimeMode === "standalone"
+                    ? {
+                        sandbox:
+                          "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-top-navigation-by-user-activation",
+                      }
+                    : {})}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  allowFullScreen
+                  className="h-full w-full min-h-0 min-w-0 border-0"
+                  onLoad={() => {
+                    setInitialLoadComplete(true);
+                  }}
+                />
+                <div
+                  aria-hidden
+                  className="absolute top-0 bottom-0 -right-1 z-10 w-3 cursor-ew-resize touch-none rounded-sm bg-transparent hover:bg-slate-400/25"
+                  onPointerDown={startDeviceFrameResize}
+                />
+              </div>
+            </div>
+          ) : (
+            <iframe
+              ref={iframeRef}
+              src={previewSrc}
+              title={t("pageEditor.preview.title")}
+              {...(runtimeMode === "standalone"
+                ? {
+                    sandbox:
+                      "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-top-navigation-by-user-activation",
+                  }
+                : {})}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+              className="h-full w-full min-h-0 min-w-0 border-0 transition-all duration-300 ease-in-out"
+              onLoad={() => {
+                setInitialLoadComplete(true);
+              }}
+            />
+          )}
+        </div>
       )}
       {showSelectionOverlay && (
         <SelectionOverlay
