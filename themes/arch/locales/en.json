@@ -1202,6 +1202,10 @@
       "center_nav": {
         "label": "Center Navigation",
         "description": "Centers the navigation menu in the header with the logo on the left and CTA on the right (desktop only)"
+      },
+      "show_language_switcher": {
+        "label": "Show Language Switcher",
+        "description": "Display a visitor-facing language dropdown in the header."
       }
     }
   },

@@ -452,6 +452,8 @@ describe("readProjectsData / writeProjectsData", () => {
         preset: null,
         receiveThemeUpdates: false,
         siteUrl: "",
+        locales: ["en"],
+        defaultLocale: "en",
         created: now,
         updated: now,
       }],
@@ -646,6 +648,15 @@ describe("createProject", () => {
   it("stores siteTitle", async () => {
     const project = await createTestProject("Site Title Project", { siteTitle: "Widgetizer Demo" });
     assert.equal(project.siteTitle, "Widgetizer Demo");
+  });
+
+  it("stores locales and defaultLocale", async () => {
+    const project = await createTestProject("Locales Project", {
+      locales: ["en", "el", "fr"],
+      defaultLocale: "el",
+    });
+    assert.deepEqual(project.locales, ["en", "el", "fr"]);
+    assert.equal(project.defaultLocale, "el");
   });
 
   it("supports a blank preset with no starter pages or menus and minimal global widgets", async () => {
@@ -1035,6 +1046,16 @@ describe("updateProject", () => {
     assert.equal(res._json.receiveThemeUpdates, true);
   });
 
+  it("updates locales and defaultLocale", async () => {
+    const res = await callController(updateProject, {
+      params: { id: project.id },
+      body: { name: "Original Name", locales: ["en", "de"], defaultLocale: "de" },
+    });
+    assert.equal(res._status, 200);
+    assert.deepEqual(res._json.locales, ["en", "de"]);
+    assert.equal(res._json.defaultLocale, "de");
+  });
+
   it("rejects invalid folderName characters on update", async () => {
     const res = await callController(updateProject, {
       params: { id: project.id },
@@ -1388,6 +1409,16 @@ describe("exportProject", () => {
     assert.equal(manifest.project.preset, null);
   });
 
+  it("manifest includes locales and defaultLocale", async () => {
+    const p = await createTestProject("Export Locales Test", {
+      locales: ["en", "el"],
+      defaultLocale: "el",
+    });
+    const { manifest } = await exportTestProject(p.id);
+    assert.deepEqual(manifest.project.locales, ["en", "el"]);
+    assert.equal(manifest.project.defaultLocale, "el");
+  });
+
   it("includes project files in the ZIP", async () => {
     const { zip } = await exportTestProject(project.id);
     const entryNames = zip.getEntries().map((e) => e.entryName);
@@ -1451,6 +1482,8 @@ describe("importProject", () => {
       receiveThemeUpdates: false,
       preset: null,
       siteUrl: "https://example.com",
+      locales: ["en", "el"],
+      defaultLocale: "en",
       created: "2025-01-01T00:00:00.000Z",
       updated: "2025-01-01T00:00:00.000Z",
     },
@@ -1472,6 +1505,8 @@ describe("importProject", () => {
     assert.equal(res._json.siteTitle, "Imported Site Title");
     assert.equal(res._json.theme, TEST_THEME_ID);
     assert.equal(res._json.siteUrl, "https://example.com");
+    assert.deepEqual(res._json.locales, ["en", "el"]);
+    assert.equal(res._json.defaultLocale, "en");
     assert.ok(res._json.id, "Should have a generated ID");
     assert.ok(res._json.folderName, "Should have a generated folderName");
 

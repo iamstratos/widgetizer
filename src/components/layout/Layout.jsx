@@ -1,6 +1,7 @@
 import Sidebar from "./Sidebar";
 import UpdateBanner from "./UpdateBanner";
 import AdminMenu from "./AdminMenu";
+import LocaleSwitcher from "./LocaleSwitcher";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import useProjectStore from "../../stores/projectStore";
@@ -36,6 +37,7 @@ export default function Layout() {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <LocaleSwitcher />
               <AdminMenu activeProject={activeProject} />
             </div>
           </header>

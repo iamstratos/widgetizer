@@ -2,6 +2,7 @@ import { Link, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import AdminMenu from "./AdminMenu";
+import LocaleSwitcher from "./LocaleSwitcher";
 import useProjectStore from "../../stores/projectStore";
 import DebugStatePanel from "../dev/DebugStatePanel";
 
@@ -31,6 +32,7 @@ export default function ProjectPickerLayout() {
           </div>
 
           <div className="flex shrink-0 items-start gap-2">
+            <LocaleSwitcher />
             <AdminMenu activeProject={activeProject} />
           </div>
         </header>

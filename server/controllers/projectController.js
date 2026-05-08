@@ -31,6 +31,31 @@ async function ensureDirectories() {
   await fs.ensureDir(path.join(DATA_DIR, "projects"));
 }
 
+function sanitizeProjectLocales(locales, defaultLocale = "en") {
+  const normalized = Array.isArray(locales)
+    ? locales
+        .map((locale) => (typeof locale === "string" ? locale.trim().toLowerCase() : ""))
+        .filter((locale) => /^[a-z]{2}$/.test(locale))
+    : [];
+
+  const uniqueLocales = Array.from(new Set(normalized));
+  const safeDefaultLocale = typeof defaultLocale === "string" ? defaultLocale.trim().toLowerCase() : "en";
+
+  if (!/^[a-z]{2}$/.test(safeDefaultLocale)) {
+    return { locales: ["en"], defaultLocale: "en" };
+  }
+
+  if (uniqueLocales.length === 0) {
+    return { locales: [safeDefaultLocale], defaultLocale: safeDefaultLocale };
+  }
+
+  if (!uniqueLocales.includes(safeDefaultLocale)) {
+    uniqueLocales.unshift(safeDefaultLocale);
+  }
+
+  return { locales: uniqueLocales, defaultLocale: safeDefaultLocale };
+}
+
 /**
  * Resolve a desired project name and folder against existing projects, returning
  * collision-free values. Used by both create and import to share identical
@@ -153,7 +178,18 @@ export async function getActiveProject(req, res) {
  */
 export async function createProject(req, res) {
   try {
-    const { name, folderName: providedFolderName, description, theme, siteTitle, siteUrl, receiveThemeUpdates, preset } = req.body;
+    const {
+      name,
+      folderName: providedFolderName,
+      description,
+      theme,
+      siteTitle,
+      siteUrl,
+      receiveThemeUpdates,
+      preset,
+      locales,
+      defaultLocale,
+    } = req.body;
 
     // Defensive check: ensure name is not empty after sanitization
     if (!name || typeof name !== "string" || name.trim() === "") {
@@ -222,6 +258,7 @@ export async function createProject(req, res) {
       preset: preset || null, // Track which preset was used
       receiveThemeUpdates: receiveThemeUpdates || false, // Opt-in flag (default: off)
       siteUrl: siteUrl && siteUrl.trim() !== "" ? stripHtmlTags(siteUrl.trim()) : "",
+      ...sanitizeProjectLocales(locales, defaultLocale || "en"),
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
     };
@@ -406,6 +443,11 @@ export async function updateProject(req, res) {
       ? (updates.siteUrl && updates.siteUrl.trim() !== "" ? stripHtmlTags(updates.siteUrl.trim()) : "")
       : undefined;
 
+    const localeConfig = sanitizeProjectLocales(
+      updates.locales !== undefined ? updates.locales : currentProject.locales,
+      updates.defaultLocale !== undefined ? updates.defaultLocale : currentProject.defaultLocale,
+    );
+
     const updatedProject = projectRepo.updateProject(id, {
       folderName: updates.folderName || currentFolderName,
       name: updates.name,
@@ -413,6 +455,8 @@ export async function updateProject(req, res) {
       siteTitle: sanitizedSiteTitle,
       siteUrl: sanitizedSiteUrl,
       receiveThemeUpdates: updates.receiveThemeUpdates,
+      locales: localeConfig.locales,
+      defaultLocale: localeConfig.defaultLocale,
     });
 
     res.json(updatedProject);
@@ -480,6 +524,8 @@ export async function duplicateProject(req, res) {
       theme: originalProject.theme,
       themeVersion: originalProject.themeVersion,
       receiveThemeUpdates: originalProject.receiveThemeUpdates || false,
+      locales: originalProject.locales || ["en"],
+      defaultLocale: originalProject.defaultLocale || "en",
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
     };
@@ -722,6 +768,8 @@ export async function exportProject(req, res) {
         receiveThemeUpdates: project.receiveThemeUpdates || false,
         preset: project.preset || null,
         siteUrl: project.siteUrl || "",
+        locales: project.locales || ["en"],
+        defaultLocale: project.defaultLocale || "en",
         created: project.created,
         updated: project.updated,
       },
@@ -974,6 +1022,7 @@ export async function importProject(req, res) {
         receiveThemeUpdates: manifest.project.receiveThemeUpdates || false,
         preset: manifest.project.preset || null,
         siteUrl: manifest.project.siteUrl || "",
+        ...sanitizeProjectLocales(manifest.project.locales, manifest.project.defaultLocale || "en"),
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
       };

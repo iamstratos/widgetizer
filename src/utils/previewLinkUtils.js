@@ -21,14 +21,24 @@ export function getStandalonePreviewTarget(href) {
     return `/preview/${previewMatch[1]}`;
   }
 
+  const localizedPreviewMatch = withoutQuery.match(/^\/?preview\/([a-z]{2})\/([^/]+)$/i);
+  if (localizedPreviewMatch) {
+    return `/preview/${localizedPreviewMatch[1].toLowerCase()}/${localizedPreviewMatch[2]}`;
+  }
+
   const htmlMatch = withoutQuery.match(/^\/?([^/]+)\.html$/);
   if (htmlMatch) {
     return `/preview/${htmlMatch[1]}`;
+  }
+
+  const localeHtmlMatch = withoutQuery.match(/^\/?([a-z]{2})\/([^/]+)\.html$/i);
+  if (localeHtmlMatch) {
+    return `/preview/${localeHtmlMatch[1].toLowerCase()}/${localeHtmlMatch[2]}`;
   }
 
   return null;
 }
 
 export function isStandalonePreviewNavigationUrl(url) {
-  return typeof url === "string" && /^\/preview\/[^/?#]+$/.test(url);
+  return typeof url === "string" && /^\/preview\/([a-z]{2}\/)?[^/?#]+$/.test(url);
 }

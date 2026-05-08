@@ -39,8 +39,8 @@ export function getProjectFolderName(projectId) {
 export function createProject(project) {
   const db = getDb();
   db.prepare(`
-    INSERT INTO projects (id, folder_name, name, description, site_title, theme, theme_version, preset, receive_theme_updates, site_url, last_theme_update_at, last_theme_update_version, created, updated)
-    VALUES (@id, @folderName, @name, @description, @siteTitle, @theme, @themeVersion, @preset, @receiveThemeUpdates, @siteUrl, @lastThemeUpdateAt, @lastThemeUpdateVersion, @created, @updated)
+    INSERT INTO projects (id, folder_name, name, description, site_title, theme, theme_version, preset, receive_theme_updates, site_url, locales, default_locale, last_theme_update_at, last_theme_update_version, created, updated)
+    VALUES (@id, @folderName, @name, @description, @siteTitle, @theme, @themeVersion, @preset, @receiveThemeUpdates, @siteUrl, @locales, @defaultLocale, @lastThemeUpdateAt, @lastThemeUpdateVersion, @created, @updated)
   `).run({
     id: project.id,
     folderName: project.folderName,
@@ -52,6 +52,8 @@ export function createProject(project) {
     preset: project.preset || null,
     receiveThemeUpdates: project.receiveThemeUpdates ? 1 : 0,
     siteUrl: project.siteUrl || "",
+    locales: JSON.stringify(project.locales || ["en"]),
+    defaultLocale: project.defaultLocale || "en",
     lastThemeUpdateAt: project.lastThemeUpdateAt || null,
     lastThemeUpdateVersion: project.lastThemeUpdateVersion || null,
     created: project.created,
@@ -83,6 +85,8 @@ export function updateProject(id, updates) {
       ? (updates.receiveThemeUpdates ? 1 : 0)
       : current.receive_theme_updates,
     siteUrl: updates.siteUrl !== undefined ? (updates.siteUrl || "") : current.site_url,
+    locales: updates.locales !== undefined ? JSON.stringify(updates.locales || ["en"]) : current.locales,
+    defaultLocale: updates.defaultLocale !== undefined ? (updates.defaultLocale || "en") : current.default_locale,
     lastThemeUpdateAt: updates.lastThemeUpdateAt !== undefined ? updates.lastThemeUpdateAt : current.last_theme_update_at,
     lastThemeUpdateVersion: updates.lastThemeUpdateVersion !== undefined ? updates.lastThemeUpdateVersion : current.last_theme_update_version,
     updated: updates.updated || new Date().toISOString(),
@@ -100,6 +104,8 @@ export function updateProject(id, updates) {
       preset = @preset,
       receive_theme_updates = @receiveThemeUpdates,
       site_url = @siteUrl,
+      locales = @locales,
+      default_locale = @defaultLocale,
       last_theme_update_at = @lastThemeUpdateAt,
       last_theme_update_version = @lastThemeUpdateVersion,
       updated = @updated
@@ -217,8 +223,8 @@ export function writeProjectsData(data) {
 
     // Upsert each project
     const upsert = db.prepare(`
-      INSERT INTO projects (id, folder_name, name, description, site_title, theme, theme_version, preset, receive_theme_updates, site_url, last_theme_update_at, last_theme_update_version, created, updated)
-      VALUES (@id, @folderName, @name, @description, @siteTitle, @theme, @themeVersion, @preset, @receiveThemeUpdates, @siteUrl, @lastThemeUpdateAt, @lastThemeUpdateVersion, @created, @updated)
+      INSERT INTO projects (id, folder_name, name, description, site_title, theme, theme_version, preset, receive_theme_updates, site_url, locales, default_locale, last_theme_update_at, last_theme_update_version, created, updated)
+      VALUES (@id, @folderName, @name, @description, @siteTitle, @theme, @themeVersion, @preset, @receiveThemeUpdates, @siteUrl, @locales, @defaultLocale, @lastThemeUpdateAt, @lastThemeUpdateVersion, @created, @updated)
       ON CONFLICT(id) DO UPDATE SET
         folder_name = @folderName,
         name = @name,
@@ -229,6 +235,8 @@ export function writeProjectsData(data) {
         preset = @preset,
         receive_theme_updates = @receiveThemeUpdates,
         site_url = @siteUrl,
+        locales = @locales,
+        default_locale = @defaultLocale,
         last_theme_update_at = @lastThemeUpdateAt,
         last_theme_update_version = @lastThemeUpdateVersion,
         updated = @updated
@@ -246,6 +254,8 @@ export function writeProjectsData(data) {
         preset: p.preset || null,
         receiveThemeUpdates: p.receiveThemeUpdates ? 1 : 0,
         siteUrl: p.siteUrl || "",
+        locales: JSON.stringify(p.locales || ["en"]),
+        defaultLocale: p.defaultLocale || "en",
         lastThemeUpdateAt: p.lastThemeUpdateAt || null,
         lastThemeUpdateVersion: p.lastThemeUpdateVersion || null,
         created: p.created,
@@ -275,6 +285,8 @@ function rowToProject(row) {
     preset: row.preset,
     receiveThemeUpdates: !!row.receive_theme_updates,
     siteUrl: row.site_url,
+    locales: parseLocales(row.locales),
+    defaultLocale: row.default_locale || "en",
     created: row.created,
     updated: row.updated,
   };
@@ -284,4 +296,18 @@ function rowToProject(row) {
   if (row.last_theme_update_version) project.lastThemeUpdateVersion = row.last_theme_update_version;
 
   return project;
+}
+
+function parseLocales(rawValue) {
+  if (!rawValue) return ["en"];
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) return ["en"];
+    const normalized = parsed
+      .map((locale) => (typeof locale === "string" ? locale.trim().toLowerCase() : ""))
+      .filter(Boolean);
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : ["en"];
+  } catch {
+    return ["en"];
+  }
 }

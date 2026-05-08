@@ -1,4 +1,4 @@
-import { File, ListTree, Image, Settings, Rocket, Eye } from "lucide-react";
+import { File, ListTree, Image, Settings, Languages, Rocket, Eye } from "lucide-react";
 
 export const navigationSections = [
   {
@@ -31,6 +31,13 @@ export const navigationSections = [
         labelKey: "navigation.settings",
         path: "/settings",
         icon: Settings,
+        requiresProject: true,
+      },
+      {
+        id: "locales",
+        labelKey: "navigation.locales",
+        path: "/settings/locales",
+        icon: Languages,
         requiresProject: true,
       },
       {

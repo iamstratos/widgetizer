@@ -29,6 +29,7 @@ import { buildRuntimeSiteIcons } from "../utils/siteIconHelpers.js";
 import { getProjectFolderName } from "../utils/projectHelpers.js";
 import { isProjectResolutionError } from "../utils/projectErrors.js";
 import { sanitizeWidgetData } from "./sanitizationService.js";
+import { resolveLocalizedSettingsMap } from "../utils/localizedSettings.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -127,7 +128,7 @@ function isLinkObject(value) {
  * @param {Map} pagesByUuid - Map of uuid -> page data
  * @returns {object} Resolved link object
  */
-function resolveLinkValue(linkValue, pagesByUuid) {
+function resolveLinkValue(linkValue, pagesByUuid, locale = "en", renderMode = "preview") {
   if (!linkValue || typeof linkValue !== "object") {
     return linkValue;
   }
@@ -143,10 +144,13 @@ function resolveLinkValue(linkValue, pagesByUuid) {
   const page = pagesByUuid.get(pageUuid);
 
   if (page) {
+    const fileName = page.slug === "index" || page.slug === "home" ? "index.html" : `${page.slug}.html`;
+    const localePrefix = `/${locale}`;
+    const resolvedHref = renderMode === "publish" ? `${localePrefix}/${fileName}` : `${localePrefix}/${fileName}`;
     // Page exists - update href to current slug
     return {
       ...linkValue,
-      href: `${page.slug}.html`,
+      href: resolvedHref,
     };
   } else {
     // Page was deleted - clear the link
@@ -166,7 +170,7 @@ function resolveLinkValue(linkValue, pagesByUuid) {
  * @param {Map} pagesByUuid - Map of uuid -> page data
  * @returns {object} Widget data with resolved links
  */
-function resolveWidgetPageLinks(widgetData, pagesByUuid) {
+function resolveWidgetPageLinks(widgetData, pagesByUuid, locale = "en", renderMode = "preview") {
   if (!widgetData || !pagesByUuid || pagesByUuid.size === 0) {
     return widgetData;
   }
@@ -178,7 +182,7 @@ function resolveWidgetPageLinks(widgetData, pagesByUuid) {
   if (resolved.settings && typeof resolved.settings === "object") {
     for (const [key, value] of Object.entries(resolved.settings)) {
       if (isLinkObject(value)) {
-        resolved.settings[key] = resolveLinkValue(value, pagesByUuid);
+        resolved.settings[key] = resolveLinkValue(value, pagesByUuid, locale, renderMode);
       }
     }
   }
@@ -189,7 +193,7 @@ function resolveWidgetPageLinks(widgetData, pagesByUuid) {
       if (block && block.settings && typeof block.settings === "object") {
         for (const [key, value] of Object.entries(block.settings)) {
           if (isLinkObject(value)) {
-            resolved.blocks[blockId].settings[key] = resolveLinkValue(value, pagesByUuid);
+            resolved.blocks[blockId].settings[key] = resolveLinkValue(value, pagesByUuid, locale, renderMode);
           }
         }
       }
@@ -499,6 +503,8 @@ async function renderWidget(
   index = null,
 ) {
   try {
+    const projectData = projectRepo.getProjectById(projectId);
+    const contentLocale = sharedGlobals?.contentLocale || projectData?.defaultLocale || "en";
     const { type, settings = {}, blocks = {}, blocksOrder = [] } = widgetData;
     const projectFolderName = await getProjectFolderName(projectId);
     const projectDir = getProjectDir(projectFolderName);
@@ -553,7 +559,7 @@ async function renderWidget(
         enhancedSettings[setting.id] = setting.default;
       });
     }
-    Object.assign(enhancedSettings, settings); // Override with provided settings
+    Object.assign(enhancedSettings, resolveLocalizedSettingsMap(settings, contentLocale, "en")); // Override with provided settings
 
     const enhancedBlocks = {};
     const blockSchemas = {};
@@ -577,7 +583,7 @@ async function renderWidget(
           ...(blockInstance || {}), // Keep original type, id etc., handle null blockInstance
           settings: {
             ...blockDefaults,
-            ...((blockInstance && blockInstance.settings) || {}), // Handle null blockInstance/settings
+            ...resolveLocalizedSettingsMap((blockInstance && blockInstance.settings) || {}, contentLocale, "en"), // Handle null blockInstance/settings
           },
         };
       });
@@ -672,6 +678,8 @@ async function renderWidget(
     const resolvedWidgetData = resolveWidgetPageLinks(
       { settings: enhancedSettings, blocks: enhancedBlocks },
       pagesByUuid,
+      contentLocale,
+      renderMode,
     );
 
     // Sanitize settings based on schema types (text, richtext, link, etc.)
@@ -696,6 +704,10 @@ async function renderWidget(
     const renderContext = {
       ...baseContext,
       widget: widgetContext,
+      page_slug: sharedGlobals?.pageSlug || "index",
+      available_locales: projectData?.locales || ["en"],
+      default_locale: projectData?.defaultLocale || "en",
+      active_locale: contentLocale,
     };
 
     // Get theme snippets directory for this project

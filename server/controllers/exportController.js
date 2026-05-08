@@ -143,6 +143,8 @@ export async function exportProjectToDir(projectId, options = {}) {
   const projectFolderName = projectData.folderName;
   const projectDir = getProjectDir(projectFolderName);
   const siteUrl = projectData.siteUrl || "";
+  const locales = Array.isArray(projectData.locales) && projectData.locales.length > 0 ? projectData.locales : ["en"];
+  const defaultLocale = projectData.defaultLocale || locales[0] || "en";
 
   const version = exportRepo.getNextVersion(projectId);
   const outputBaseDir = getPublishDir();
@@ -185,9 +187,11 @@ export async function exportProjectToDir(projectId, options = {}) {
 
         // 1. Generate sitemap.xml
         const sitemapUrls = pagesDataArray
-          .filter((page) => !page.seo?.robots?.includes("noindex")) // Filter out 'noindex' pages
-          .map((page) => {
-            const pageUrl = new URL(`${page.slug}.html`, siteUrl).href;
+          .filter((page) => !page.seo?.robots?.includes("noindex"))
+          .flatMap((page) => locales.map((locale) => ({ page, locale })))
+          .map(({ page, locale }) => {
+            const filename = page.slug === "index" || page.slug === "home" ? "index.html" : `${page.slug}.html`;
+            const pageUrl = new URL(`${locale}/${filename}`, siteUrl).href;
             const lastMod = page.updated || page.gcreated || new Date().toISOString();
             return `
   <url>
@@ -209,11 +213,16 @@ export async function exportProjectToDir(projectId, options = {}) {
           new Set(
             pagesDataArray
               .filter((page) => page.seo?.robots?.includes("noindex"))
-              .map((page) => {
+              .flatMap((page) => locales.map((locale) => ({ page, locale })))
+              .flatMap(({ page, locale }) => {
                 const pageId = page.id || page.slug;
-                if (!pageId) return null;
+                if (!pageId) return [];
                 const filename = pageId === "index" || pageId === "home" ? "index.html" : `${pageId}.html`;
-                return `/${filename}`;
+                const perLocale = [`/${locale}/${filename}`];
+                if (locale === defaultLocale) {
+                  perLocale.push(`/${filename}`);
+                }
+                return perLocale;
               })
               .filter(Boolean),
           ),
@@ -269,6 +278,7 @@ export async function exportProjectToDir(projectId, options = {}) {
     const validationIssues = [];
 
     for (const pageData of pagesDataArray) {
+      for (const locale of locales) {
       // Create shared globals for this page (each page gets fresh enqueue Maps)
       const sharedGlobals = {
         projectId,
@@ -280,6 +290,7 @@ export async function exportProjectToDir(projectId, options = {}) {
         enqueuedScripts: new Map(),
         exportVersion: version, // For cache busting
         pageSlug: pageData.slug || "",
+        contentLocale: locale,
       };
 
       // Render header if exists (for each page to capture enqueued assets)
@@ -384,7 +395,7 @@ Per aspera ad astra
 
       // Determine output filename (e.g., index.html for homepage, slug.html otherwise)
       const outputFilename = pageData.id === "index" || pageData.id === "home" ? "index.html" : `${pageData.id}.html`;
-      const outputFilePath = path.join(outputDir, outputFilename);
+      const outputFilePath = path.join(outputDir, locale, outputFilename);
 
       // Inject markdown alternate link into <head> when markdown export is enabled
       if (exportMarkdown) {
@@ -392,7 +403,7 @@ Per aspera ad astra
         let mdHref = mdFilename;
         if (validSiteUrl) {
           try {
-            mdHref = new URL(mdFilename, siteUrl).href;
+            mdHref = new URL(`${locale}/${mdFilename}`, siteUrl).href;
           } catch { /* fall back to relative */ }
         }
         processedHtml = processedHtml.replace("</head>", `  <link rel="alternate" type="text/markdown" href="${mdHref}">\n</head>`);
@@ -400,6 +411,25 @@ Per aspera ad astra
 
       // Write the processed (and potentially formatted) HTML file
       await fs.outputFile(outputFilePath, processedHtml);
+      if (locale === defaultLocale) {
+        let rootProcessedHtml = processedHtml;
+        if (exportMarkdown) {
+          const rootMdFilename = pageData.id === "index" || pageData.id === "home" ? "index.md" : `${pageData.id}.md`;
+          let rootMdHref = rootMdFilename;
+          if (validSiteUrl) {
+            try {
+              rootMdHref = new URL(rootMdFilename, siteUrl).href;
+            } catch {
+              rootMdHref = rootMdFilename;
+            }
+          }
+          rootProcessedHtml = processedHtml.replace(
+            /<link rel="alternate" type="text\/markdown" href="[^"]*">/,
+            `<link rel="alternate" type="text/markdown" href="${rootMdHref}">`,
+          );
+        }
+        await fs.outputFile(path.join(outputDir, outputFilename), rootProcessedHtml);
+      }
 
       // Generate markdown version (content only, no layout) - if enabled
       if (exportMarkdown) {
@@ -433,12 +463,17 @@ Per aspera ad astra
             "",
           ].join("\n");
 
-          await fs.outputFile(path.join(outputDir, mdFilename), frontmatter + markdownContent);
+          await fs.outputFile(path.join(outputDir, locale, mdFilename), frontmatter + markdownContent);
+          if (locale === defaultLocale) {
+            await fs.outputFile(path.join(outputDir, mdFilename), frontmatter + markdownContent);
+          }
         } catch (mdError) {
           console.warn(`Could not generate markdown for ${pageData.id}: ${mdError.message}`);
         }
       }
+      }
     }
+
 
     // Generate validation issues report if any (only when developer mode is enabled)
     if (devModeEnabled) {

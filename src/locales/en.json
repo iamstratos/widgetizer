@@ -8,6 +8,7 @@
     "menus": "Menus",
     "media": "Media",
     "settings": "Site settings",
+    "locales": "Locales",
     "sitePreview": "Site preview",
     "appearance": "Appearance",
     "themes": "Themes",
@@ -108,7 +109,14 @@
       "presetHelp": "Choose a visual style and demo content layout.",
       "loadingPresets": "Loading presets...",
       "receiveThemeUpdatesLabel": "Receive theme updates",
-      "receiveThemeUpdatesHelp": "Get notified when a new version of the theme is available."
+      "receiveThemeUpdatesHelp": "Get notified when a new version of the theme is available.",
+      "localesLabel": "Website Languages",
+      "localesHelp": "Add two-letter language codes for your website content (e.g., en, el, fr).",
+      "localePlaceholder": "e.g. en",
+      "addLocale": "Add",
+      "removeLocaleAria": "Remove {{locale}} language",
+      "defaultLocaleLabel": "Default Language",
+      "defaultLocaleHelp": "Used as the primary language for rendering/export."
     },
     "media": {
       "editTitle": "Edit {{type}} Metadata",
@@ -432,6 +440,7 @@
     },
     "settingsPanel": {
       "emptyState": "Select a widget to edit its settings",
+      "contentLanguage": "Content language",
       "blockSettings": "Block Settings",
       "header": "Header",
       "footer": "Footer",
@@ -593,6 +602,22 @@
       "loadError": "Failed to load theme settings. Please try again.",
       "saveSuccess": "Theme settings saved successfully!",
       "saveError": "Failed to save theme settings. Please try again."
+    }
+  },
+  "localesSettings": {
+    "title": "Locales",
+    "description": "Manage your website locales and default locale.",
+    "languagesLabel": "Website languages",
+    "languagesHelp": "Add 2-letter locales, e.g. en, el, fr.",
+    "localePlaceholder": "e.g. en",
+    "addLocale": "Add locale",
+    "removeLocaleAria": "Remove locale {{locale}}",
+    "defaultLocaleLabel": "Default locale",
+    "defaultLocaleHelp": "The default locale used for rendering and fallback URLs.",
+    "toasts": {
+      "saveSuccess": "Locales updated",
+      "saveError": "Failed to update locales",
+      "invalidLocale": "Locale must be a 2-letter code"
     }
   },
   "themes": {

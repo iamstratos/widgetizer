@@ -6,6 +6,7 @@ import { Monitor, Smartphone } from "lucide-react";
 import usePageStore from "../stores/pageStore";
 import useThemeStore from "../stores/themeStore";
 import useProjectStore from "../stores/projectStore";
+import useLocaleStore from "../stores/localeStore";
 import PreviewPanel from "../components/pageEditor/PreviewPanel";
 import { isStandalonePreviewNavigationUrl } from "../utils/previewLinkUtils";
 
@@ -14,10 +15,11 @@ import DebugStatePanel from "../components/dev/DebugStatePanel";
 
 export default function PagePreview() {
   const { t } = useTranslation();
-  const { pageId } = useParams();
+  const { pageId, locale } = useParams();
   const navigate = useNavigate();
   const [previewMode, setPreviewMode] = useState(() => localStorage.getItem("editorPreviewMode") || "desktop");
   const activeProject = useProjectStore((state) => state.activeProject);
+  const setContentLocale = useLocaleStore((state) => state.setContentLocale);
 
   const { page, loading, error, loadPage } = usePageStore();
   const themeSettings = useThemeStore((s) => s.settings);
@@ -26,6 +28,14 @@ export default function PagePreview() {
   useEffect(() => {
     loadPage(pageId);
   }, [pageId, activeProject?.id, loadPage]);
+
+  useEffect(() => {
+    if (!locale) return;
+    const normalized = locale.trim().toLowerCase();
+    if (/^[a-z]{2}$/.test(normalized)) {
+      setContentLocale(normalized);
+    }
+  }, [locale, setContentLocale]);
 
   // Handle cross-origin navigation requests from the preview iframe
   useEffect(() => {

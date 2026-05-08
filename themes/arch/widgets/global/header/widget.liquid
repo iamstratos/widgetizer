@@ -21,6 +21,16 @@
     .widget-site-header .header-logo img {
       display: inline-block;
     }
+    .widget-site-header .header-language-switcher {
+      min-width: 92px;
+      height: 2.5rem;
+      border: 1px solid color-mix(in srgb, var(--text-color) 22%, transparent);
+      border-radius: 0.5rem;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      padding: 0 0.65rem;
+    }
     {% unless widget.settings.full_width %}
     .widget-site-header .header-inner {
       max-width: var(--container-max-width);
@@ -117,6 +127,27 @@
       </nav>
 
       <div class="header-end">
+        {% assign current_slug = page_slug | default: 'index' %}
+        {% assign current_file = current_slug | append: '.html' %}
+        {% if current_slug == 'index' or current_slug == 'home' %}
+          {% assign current_file = 'index.html' %}
+        {% endif %}
+
+        {% if widget.settings.show_language_switcher and available_locales and available_locales.size > 1 %}
+          <label class="sr-only" for="header-locale-switcher-{{ widget.id }}">Language</label>
+          <select
+            id="header-locale-switcher-{{ widget.id }}"
+            class="header-language-switcher"
+            aria-label="Language"
+            onchange="if(this.value){window.location.href=this.value;}"
+          >
+            {% for locale in available_locales %}
+              {% assign locale_path = '/' | append: locale | append: '/' | append: current_file %}
+              <option value="{{ locale_path }}" {% if locale == active_locale %}selected{% endif %}>{{ locale | upcase }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+
         {% if widget.settings.contact_position == 'menu' %}
           {% if widget.settings.contactDetailsLine1 != blank or widget.settings.contactDetailsLine2 != blank %}
             <div class="header-contact header-contact-right">

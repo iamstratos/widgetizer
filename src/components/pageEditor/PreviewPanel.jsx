@@ -7,6 +7,8 @@ import useProjectStore from "../../stores/projectStore";
 import useWidgetStore from "../../stores/widgetStore";
 import { BASE_URL } from "../../config";
 import SelectionOverlay from "./SelectionOverlay";
+import { getLocalizedValue } from "../../utils/localizedSettings";
+import useLocaleStore from "../../stores/localeStore";
 
 // Build the preview URL from a token
 function buildPreviewUrl(token) {
@@ -156,7 +158,7 @@ const PreviewPanel = forwardRef(function PreviewPanel(
   },
   ref,
 ) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { tTheme } = useThemeLocale();
   const [previewSrc, setPreviewSrc] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -164,6 +166,7 @@ const PreviewPanel = forwardRef(function PreviewPanel(
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [previewReadyKey, setPreviewReadyKey] = useState(0);
   const iframeRef = useRef(null);
+  const contentLocale = useLocaleStore((state) => state.contentLocale);
 
   // A single ref to hold the entire previous state for comparison
   const previousStateRef = useRef(null);
@@ -324,6 +327,8 @@ const PreviewPanel = forwardRef(function PreviewPanel(
     selectedBlockId,
     selectedGlobalWidgetId,
     runtimeMode,
+    contentLocale,
+    i18n.language,
   ]);
 
   // Handle updates after initial load
@@ -374,7 +379,7 @@ const PreviewPanel = forwardRef(function PreviewPanel(
           if (settingsChanged) {
             Object.entries(widget.settings || {}).forEach(([key, value]) => {
               if (JSON.stringify(value) !== JSON.stringify(oldWidget.settings?.[key])) {
-                changes.settings[key] = value;
+                changes.settings[key] = getLocalizedValue(value, contentLocale || i18n.language || "en", "en");
               }
             });
           }
@@ -387,7 +392,7 @@ const PreviewPanel = forwardRef(function PreviewPanel(
                 const changedBlockSettings = {};
                 Object.entries(newBlock.settings || {}).forEach(([key, value]) => {
                   if (JSON.stringify(value) !== JSON.stringify(oldBlock.settings?.[key])) {
-                    changedBlockSettings[key] = value;
+                    changedBlockSettings[key] = getLocalizedValue(value, contentLocale || i18n.language || "en", "en");
                   }
                 });
                 if (Object.keys(changedBlockSettings).length > 0) {
@@ -424,7 +429,7 @@ const PreviewPanel = forwardRef(function PreviewPanel(
           if (settingsChanged) {
             Object.entries(globalWidget.settings || {}).forEach(([key, value]) => {
               if (JSON.stringify(value) !== JSON.stringify(oldGlobalWidget.settings?.[key])) {
-                changes.settings[key] = value;
+                changes.settings[key] = getLocalizedValue(value, contentLocale || i18n.language || "en", "en");
               }
             });
           }
@@ -437,7 +442,7 @@ const PreviewPanel = forwardRef(function PreviewPanel(
                 const changedBlockSettings = {};
                 Object.entries(newBlock.settings || {}).forEach(([key, value]) => {
                   if (JSON.stringify(value) !== JSON.stringify(oldBlock.settings?.[key])) {
-                    changedBlockSettings[key] = value;
+                    changedBlockSettings[key] = getLocalizedValue(value, contentLocale || i18n.language || "en", "en");
                   }
                 });
                 if (Object.keys(changedBlockSettings).length > 0) {
@@ -553,6 +558,8 @@ const PreviewPanel = forwardRef(function PreviewPanel(
     selectedBlockId,
     selectedGlobalWidgetId,
     runtimeMode,
+    contentLocale,
+    i18n.language,
   ]);
 
   return (

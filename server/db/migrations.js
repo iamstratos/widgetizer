@@ -80,6 +80,16 @@ const migrations = [
       `);
     },
   },
+  {
+    version: 2,
+    description: "Project locales and default locale",
+    up(db) {
+      db.exec(`
+        ALTER TABLE projects ADD COLUMN locales TEXT DEFAULT '["en"]';
+        ALTER TABLE projects ADD COLUMN default_locale TEXT DEFAULT 'en';
+      `);
+    },
+  },
 ];
 
 /**

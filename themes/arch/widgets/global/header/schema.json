@@ -86,6 +86,13 @@
       "default": false
     },
     {
+      "type": "checkbox",
+      "id": "show_language_switcher",
+      "label": "tTheme:header.settings.show_language_switcher.label",
+      "description": "tTheme:header.settings.show_language_switcher.description",
+      "default": false
+    },
+    {
       "type": "link",
       "id": "ctaButtonLink",
       "label": "tTheme:header.settings.ctaButtonLink.label",

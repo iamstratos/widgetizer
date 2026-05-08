@@ -5,6 +5,7 @@ import useProjectStore from "../../stores/projectStore";
 import { navigationSections } from "../../config/navigation";
 import { getAllPages } from "../../queries/pageManager";
 import SidebarMeta from "./SidebarMeta";
+import useLocaleStore from "../../stores/localeStore";
 
 export default function Sidebar() {
   const { t } = useTranslation();
@@ -12,6 +13,7 @@ export default function Sidebar() {
   const activeProject = useProjectStore((state) => state.activeProject);
   const hasActiveProject = !!activeProject;
   const [hasPages, setHasPages] = useState(false);
+  const contentLocale = useLocaleStore((state) => state.contentLocale);
 
   useEffect(() => {
     let isCancelled = false;
@@ -79,7 +81,7 @@ export default function Sidebar() {
         return;
       }
 
-      const previewUrl = new URL(`/preview/${homepage.id}`, window.location.origin).toString();
+      const previewUrl = new URL(`/preview/${contentLocale || "en"}/${homepage.id}`, window.location.origin).toString();
       const previewWindow = window.open(previewUrl, "widgetizer-preview");
       previewWindow?.focus();
     } catch (error) {

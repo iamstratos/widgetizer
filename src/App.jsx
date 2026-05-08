@@ -11,6 +11,7 @@ import MenusAdd from "./pages/MenusAdd";
 import MenusEdit from "./pages/MenusEdit";
 import Media from "./pages/Media";
 import Settings from "./pages/Settings";
+import LocalesSettings from "./pages/LocalesSettings";
 import Themes from "./pages/Themes";
 import ExportSite from "./pages/ExportSite";
 import AppSettings from "./pages/AppSettings";
@@ -123,6 +124,10 @@ const router = createBrowserRouter(
               element: <Settings />,
             },
             {
+              path: "settings/locales",
+              element: <LocalesSettings />,
+            },
+            {
               path: "export-site",
               element: <ExportSite />,
             },
@@ -132,6 +137,11 @@ const router = createBrowserRouter(
     },
     {
       path: "/preview/:pageId",
+      element: <PagePreview />,
+      errorElement: <RouteError />,
+    },
+    {
+      path: "/preview/:locale/:pageId",
       element: <PagePreview />,
       errorElement: <RouteError />,
     },

@@ -4,7 +4,11 @@ import usePageStore from "../../stores/pageStore";
 import useWidgetStore from "../../stores/widgetStore";
 import useAutoSave from "../../stores/saveStore";
 import { useTranslation } from "react-i18next";
+import { useMemo } from "react";
 import { useThemeLocale } from "../../hooks/useThemeLocale";
+import { getLocalizedValue, isSettingLocalizable, setLocalizedValue } from "../../utils/localizedSettings";
+import useProjectStore from "../../stores/projectStore";
+import useLocaleStore from "../../stores/localeStore";
 
 export default function SettingsPanel({
   selectedWidget,
@@ -17,11 +21,12 @@ export default function SettingsPanel({
   widgetSchemas,
   onBackToWidget,
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { tTheme } = useThemeLocale();
   const { globalWidgets, updateThemeSetting } = usePageStore();
   const { updateWidgetSettings, updateGlobalWidgetSettings, updateBlockSettings } = useWidgetStore();
   const { markWidgetModified, setThemeSettingsModified } = useAutoSave();
+  const activeProject = useProjectStore((state) => state.activeProject);
 
   const isGlobalWidget = !!selectedGlobalWidgetId;
   const isThemeSettings = !!selectedThemeGroup;
@@ -52,6 +57,17 @@ export default function SettingsPanel({
     : selectedBlockId
       ? selectedBlock?.settings
       : currentWidget?.settings;
+  const activeContentLocale = useLocaleStore((state) => state.contentLocale);
+  const setContentLocale = useLocaleStore((state) => state.setContentLocale);
+  const contentLocales = useMemo(() => {
+    const locales = new Set(activeProject?.locales || ["en"]);
+    if (i18n.language) locales.add(i18n.language);
+    if (activeContentLocale) locales.add(activeContentLocale);
+    return Array.from(locales);
+  }, [activeContentLocale, activeProject?.locales, i18n.language]);
+  const effectiveContentLocale = contentLocales.includes(activeContentLocale)
+    ? activeContentLocale
+    : (activeProject?.defaultLocale || "en");
 
   if (!isThemeSettings && (!currentWidget || (!selectedWidgetId && !selectedGlobalWidgetId))) {
     return (
@@ -64,20 +80,27 @@ export default function SettingsPanel({
   }
 
   const handleSettingChange = (settingId, value) => {
+    const settingSchema = settings?.find((setting) => setting.id === settingId);
+    const existingValue = currentValues?.[settingId];
+    const shouldLocalizeSetting = !isThemeSettings && isSettingLocalizable(settingSchema);
+    const nextValue = shouldLocalizeSetting
+      ? setLocalizedValue(existingValue, effectiveContentLocale, value, "en")
+      : value;
+
     if (isThemeSettings) {
-      updateThemeSetting(selectedThemeGroup, settingId, value);
+      updateThemeSetting(selectedThemeGroup, settingId, nextValue);
       setThemeSettingsModified(true);
     } else if (isGlobalWidget && selectedBlockId) {
-      updateBlockSettings(selectedGlobalWidgetId, selectedBlockId, settingId, value);
+      updateBlockSettings(selectedGlobalWidgetId, selectedBlockId, settingId, nextValue);
       markWidgetModified(selectedGlobalWidgetId);
     } else if (isGlobalWidget) {
-      updateGlobalWidgetSettings(selectedGlobalWidgetId, settingId, value);
+      updateGlobalWidgetSettings(selectedGlobalWidgetId, settingId, nextValue);
       markWidgetModified(selectedGlobalWidgetId);
     } else if (selectedBlockId) {
-      updateBlockSettings(selectedWidgetId, selectedBlockId, settingId, value);
+      updateBlockSettings(selectedWidgetId, selectedBlockId, settingId, nextValue);
       markWidgetModified(selectedWidgetId);
     } else {
-      updateWidgetSettings(selectedWidgetId, settingId, value);
+      updateWidgetSettings(selectedWidgetId, settingId, nextValue);
       markWidgetModified(selectedWidgetId);
     }
   };
@@ -130,6 +153,24 @@ export default function SettingsPanel({
         )}
       </div>
       <div className="px-4 pb-4 flex-1 overflow-y-auto">
+        {!isThemeSettings && (
+          <div className="pt-3 pb-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              {t("pageEditor.settingsPanel.contentLanguage", "Content language")}
+            </label>
+            <select
+              className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-md bg-white"
+              value={effectiveContentLocale}
+              onChange={(event) => setContentLocale(event.target.value)}
+            >
+              {contentLocales.map((locale) => (
+                <option key={locale} value={locale}>
+                  {locale.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div
           key={
             isThemeSettings
@@ -155,7 +196,11 @@ export default function SettingsPanel({
               <SettingsRenderer
                 key={`${contextKey}-${setting.id}`}
                 setting={setting}
-                value={currentValues?.[setting.id]}
+                value={
+                  !isThemeSettings && isSettingLocalizable(setting)
+                    ? getLocalizedValue(currentValues?.[setting.id], effectiveContentLocale, "en")
+                    : currentValues?.[setting.id]
+                }
                 onChange={handleSettingChange}
                 isFirst={index === 0}
                 allowExpand

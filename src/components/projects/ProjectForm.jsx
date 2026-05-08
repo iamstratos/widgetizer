@@ -10,7 +10,15 @@ import useToastStore from "../../stores/toastStore";
 import { getThemePresets, getPresetScreenshotUrl } from "../../queries/themeManager";
 
 export default function ProjectForm({
-  initialData = { name: "", description: "", siteTitle: "", theme: "", siteUrl: "" },
+  initialData = {
+    name: "",
+    description: "",
+    siteTitle: "",
+    theme: "",
+    siteUrl: "",
+    locales: ["en"],
+    defaultLocale: "en",
+  },
   onSubmit,
   isSubmitting,
   submitLabel = "Save",
@@ -383,6 +391,7 @@ export default function ProjectForm({
                 {errors.folderName && <p className="form-error">{errors.folderName.message}</p>}
                 <p className="form-description">{t("forms.project.folderNameHelp")}</p>
               </div>
+
 
               <div className="form-field">
                 <label htmlFor="description" className="form-label-optional">
